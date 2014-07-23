@@ -37,10 +37,15 @@ module LogStash
       ::File.join(PLUGINS_DIR, ruby_engine, gem_ruby_version)
     end
 
+    def gem_home
+      "#{gem_target}/#{ruby_engine}/#{gem_ruby_version}/"
+    end
+
     def set_gem_paths!
       require ::File.join(BUNDLE_DIR, "bundler", "setup.rb")
       ENV["GEM_PATH"] = plugins_home
       ENV["GEM_HOME"] = plugins_home
+      Gem.paths = plugins_home
     end
 
     # @return [String] major.minor ruby version, ex 1.9
@@ -94,5 +99,12 @@ module LogStash
       Gem::Specification.add_spec logstash_spec
     end
 
+    def load_locale!
+      require "i18n"
+      I18n.enforce_available_locales = true
+      I18n.load_path << LogStash::Environment.locales_path("en.yml")
+      I18n.reload!
+      fail "No locale? This is a bug." if I18n.available_locales.empty?
+    end
   end
 end
