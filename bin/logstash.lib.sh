@@ -70,7 +70,14 @@ setup_drip() {
 
 setup_vendored_jruby() {
   #JRUBY_JAR=$(ls "${basedir}"/vendor/jruby/jruby-complete-*.jar)
-  JRUBY_BIN=$(ls "${basedir}"/vendor/jruby/bin/jruby)
+  JRUBY_BIN="${basedir}/vendor/jruby/bin/jruby"
+
+  if [ ! -f "${JRUBY_BIN}" ] ; then
+    echo "Unable to find JRuby."
+    echo "If you are a user, this is a bug."
+    echo "If you are a developer, please run 'rake bootstrap'. Running 'rake' requires the 'ruby' program be available."
+    exit 1
+  fi
   VENDORED_JRUBY=1
 }
 

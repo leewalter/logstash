@@ -37,10 +37,6 @@ module LogStash
       ::File.join(PLUGINS_DIR, ruby_engine, gem_ruby_version)
     end
 
-    def gem_home
-      "#{gem_target}/#{ruby_engine}/#{gem_ruby_version}/"
-    end
-
     def set_gem_paths!
       require ::File.join(BUNDLE_DIR, "bundler", "setup.rb")
       ENV["GEM_PATH"] = plugins_home

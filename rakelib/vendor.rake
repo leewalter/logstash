@@ -206,7 +206,7 @@ namespace "vendor" do
     Rake::Task["dependency:stud"].invoke
 
     # Skip bundler if we've already done this recently.
-    donefile = File.join(LogStash::Environment.gem_target, ".done")
+    donefile = File.join(LogStash::Environment.gem_home, ".done")
     if File.file?(donefile) 
       age = (Time.now - File.lstat(donefile).mtime)
       # Skip if the donefile was last modified recently
@@ -216,7 +216,16 @@ namespace "vendor" do
     # Try installing a few times in case we hit the "bad_record_mac" ssl error during installation.
     10.times do
       begin
-        Bundler::CLI.start(["install", "--gemfile=tools/Gemfile", "--path", LogStash::Environment.gem_target, "--clean", "--without", "development", "--jobs", 4])
+        #Bundler::CLI.start(["install", "--gemfile=tools/Gemfile", "--path", LogStash::Environment.gem_home, "--clean", "--standalone", "--without", "development", "--jobs", 4])
+        # There doesn't seem to be a way to invoke Bundler::CLI *and* have a
+        # different GEM_HOME set that doesn't impact Bundler's view of what
+        # gems are available. I asked about this in #bundler on freenode, and I
+        # was told to stop using the bundler ruby api. Oh well :(
+        bundler = File.join(Gem.bindir, "bundle")
+        jruby = File.join("vendor", "jruby", "bin", "jruby")
+        cmd = [jruby,  bundler, "install", "--gemfile=tools/Gemfile", "--path", LogStash::Environment.gem_home, "--clean", "--without", "development", "--jobs", "4"]
+        system(*cmd)
+        raise $! unless $?.success?
         break
       rescue Gem::RemoteFetcher::FetchError => e
         puts e.message

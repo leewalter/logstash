@@ -9,7 +9,7 @@ rule ".rb" => ".treetop" do |task, args|
   puts "Compiling #{task.source}"
 end
 
-namespace "build" do
+namespace "compile" do
   desc "Compile the config grammar"
   task "grammar" => "lib/logstash/config/grammar.rb"
 

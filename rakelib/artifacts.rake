@@ -40,33 +40,99 @@ namespace "artifact" do
     puts "Complete: #{tarpath}"
   end
 
-  desc "Build an RPM of logstash with all dependencies"
-  task "rpm" do
+  def package(platform, version, package_files)
     Rake::Task["dependency:fpm"].invoke
+    require "fpm/errors" # TODO(sissel): fix this in fpm
     require "fpm/package/dir"
-    require "fpm/package/rpm"
+    require "fpm/package/gem" # TODO(sissel): fix this in fpm; rpm needs it.
 
-    input = FPM::Package::Dir.new
+    dir = FPM::Package::Dir.new
 
-    package_files.each do |path|
-      package.input("#{path}=/opt/logstash/#{path}")
+    package_files.each do |glob|
+      Rake::FileList[glob].each do |path|
+        dir.input("#{path}=/opt/logstash/#{path}")
+      end
     end
 
-    # Do any platform-specific stuff
+    basedir = File.join(File.dirname(__FILE__), "..")
 
-    # Convert it to an rpm
-    package = package.convert(FPM::Package::RPM)
+    File.join(basedir, "pkg", "logrotate.conf").tap do |path|
+      dir.input("#{path}=/etc/logrotate.d/logstash")
+    end
+
+    case platform
+      when "redhat", "centos"
+        File.join(basedir, "pkg", "logrotate.conf").tap do |path|
+          dir.input("#{path}=/etc/logrotate.d/logstash")
+        end
+        File.join(basedir, "pkg", "logstash.default").tap do |path|
+          dir.input("#{path}=/etc/sysconfig/logstash")
+        end
+        require "fpm/package/rpm"
+        out = dir.convert(FPM::Package::RPM)
+        out.license = "ASL 2.0" # Red Hat calls 'Apache Software License' == ASL
+        out.attributes[:rpm_use_file_permissions] = true
+        out.attributes[:rpm_user] = "root"
+        out.attributes[:rpm_group] = "root"
+        out.config_files << "etc/sysconfig/logstash"
+        out.config_files << "etc/logrotate.d/logstash"
+      when "debian", "ubuntu"
+        File.join(basedir, "pkg", "logstash.default").tap do |path|
+          dir.input("#{path}=/etc/default/logstash")
+        end
+        require "fpm/package/deb"
+        out = dir.convert(FPM::Package::Deb)
+        out.license = "Apache 2.0"
+        out.attributes[:deb_user] = "root"
+        out.attributes[:deb_group] = "root"
+        # TODO(sissel): this file should go away once pleaserun is implemented.
+        out.config_files << "/etc/default/logstash"
+
+        out.config_files << "/etc/logrotate.d/logstash"
+        out.dependencies << "logrotate"
+    end
+
+    # Packaging install/removal scripts
+    ["before", "after"].each do |stage|
+      ["install", "remove"].each do |action|
+        script = "#{stage}-#{action}" # like, "before-install"
+        script_sym = script.gsub("-", "_").to_sym
+        script_path = File.join(File.dirname(__FILE__), "..", "pkg", platform, "#{script}.sh")
+        next unless File.exists?(script_path)
+
+        out.scripts[script_sym] = File.read(script_path)
+      end
+    end
+
+    # TODO(sissel): Invoke Pleaserun to generate the init scripts/whatever
+
+    out.name = "logstash"
+    out.version = LOGSTASH_VERSION
+    out.architecture = "all"
+    # TODO(sissel): Include the git commit hash?
+    out.iteration = "1" # what revision?
+    out.url = "http://logstash.net"
+    out.description = "An extensible logging pipeline"
+    out.vendor = "Elasticsearch"
+    
+    out.attributes[:force?] = true # overwrite the rpm/deb/etc being created
     begin
-      output = "NAME-VERSION.ARCH.rpm"
-      package.output(rpm.to_s(output))
+      path = File.join(basedir, "build", out.to_s)
+      x = out.output(path)
+      puts "Completed: #{path}"
     ensure
-      rpm.cleanup
+      out.cleanup
     end
   end
 
   desc "Build an RPM of logstash with all dependencies"
+  task "rpm" => ["vendor:elasticsearch", "vendor:collectd", "vendor:jruby", "vendor:gems"] do
+    package("centos", "5", package_files)
+  end
+
+  desc "Build an RPM of logstash with all dependencies"
   task "deb" do
-    Rake::Task["dependency:fpm"].invoke
+    package("ubuntu", "12.04", package_files)
   end
 end
 
