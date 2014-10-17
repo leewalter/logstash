@@ -85,6 +85,7 @@ namespace "artifact" do
         out.license = "Apache 2.0"
         out.attributes[:deb_user] = "root"
         out.attributes[:deb_group] = "root"
+        out.attributes[:deb_suggests] = "java7-runtime-headless"
         # TODO(sissel): this file should go away once pleaserun is implemented.
         out.config_files << "/etc/default/logstash"
 
