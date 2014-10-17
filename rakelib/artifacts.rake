@@ -90,7 +90,6 @@ namespace "artifact" do
         out.config_files << "/etc/default/logstash"
 
         out.config_files << "/etc/logrotate.d/logstash"
-        out.dependencies << "logrotate"
     end
 
     # Packaging install/removal scripts
@@ -112,9 +111,23 @@ namespace "artifact" do
     out.architecture = "all"
     # TODO(sissel): Include the git commit hash?
     out.iteration = "1" # what revision?
-    out.url = "http://logstash.net"
+    out.url = "http://www.elasticsearch.org/overview/logstash/"
     out.description = "An extensible logging pipeline"
     out.vendor = "Elasticsearch"
+    out.dependencies << "logrotate"
+
+    # We don't specify a dependency on Java because:
+    # - On Red Hat, Oracle and Red Hat both label their java packages in
+    #   incompatible ways. Further, there is no way to guarantee a qualified
+    #   version is available to install.
+    # - On Debian and Ubuntu, there is no Oracle package and specifying a
+    #   correct version of OpenJDK is impossible because there is no guarantee that
+    #   is impossible for the same reasons as the Red Hat section above.
+    # References:
+    # - http://www.elasticsearch.org/blog/java-1-7u55-safe-use-elasticsearch-lucene/
+    # - deb: https://github.com/elasticsearch/logstash/pull/1008
+    # - rpm: https://github.com/elasticsearch/logstash/issues/1673
+    # - rpm: https://logstash.jira.com/browse/LOGSTASH-1020
     
     out.attributes[:force?] = true # overwrite the rpm/deb/etc being created
     begin
@@ -124,7 +137,7 @@ namespace "artifact" do
     ensure
       out.cleanup
     end
-  end
+  end # def package
 
   desc "Build an RPM of logstash with all dependencies"
   task "rpm" => ["vendor:elasticsearch", "vendor:collectd", "vendor:jruby", "vendor:gems"] do
