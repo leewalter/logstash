@@ -10,11 +10,7 @@ namespace "artifact" do
     "CONTRIBUTORS",
     "{bin,lib,spec,locales}/{,**/*}",
     "patterns/**/*",
-    "vendor/elasticsearch/**/*",
-    "vendor/collectd/**/*",
-    "vendor/jruby/**/*",
-    "vendor/kafka/**/*",
-    "vendor/geoip/**/*",
+    "vendor/??*/**/*",
     File.join(LogStash::Environment.gem_home.gsub(Dir.pwd + "/", ""), "{gems,specifications}/**/*"),
     "Rakefile",
     "rakelib/*",
@@ -126,6 +122,7 @@ namespace "artifact" do
     # References:
     # - http://www.elasticsearch.org/blog/java-1-7u55-safe-use-elasticsearch-lucene/
     # - deb: https://github.com/elasticsearch/logstash/pull/1008
+    # - rpm: https://github.com/elasticsearch/logstash/pull/1290
     # - rpm: https://github.com/elasticsearch/logstash/issues/1673
     # - rpm: https://logstash.jira.com/browse/LOGSTASH-1020
     
