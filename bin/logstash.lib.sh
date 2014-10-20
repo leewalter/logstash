@@ -114,15 +114,3 @@ setup() {
 
   export RUBYLIB="${basedir}/lib"
 }
-
-install_deps() {
-  if [ -f "$basedir/logstash.gemspec" ] ; then
-    if [ -z "$VENDORED_JRUBY" ] ; then
-      exec "${RUBYCMD}" "${basedir}/gembag.rb" "${basedir}/logstash.gemspec" "$@"
-    else
-      exec "$JRUBY_BIN" $JAVA_OPTS "${basedir}/gembag.rb" "${basedir}/logstash.gemspec" "$@"
-    fi
-  else
-    echo "Cannot install dependencies; missing logstash.gemspec. This 'deps' command only works from a logstash git clone."
-  fi
-}

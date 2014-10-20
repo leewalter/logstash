@@ -8,9 +8,6 @@
 #
 # See 'bin/logstash help' for a list of commands.
 #
-# NOTE: One extra command is available 'deps'
-# The 'deps' command will install dependencies for logstash.
-
 # Defaults you can override with environment variables
 LS_HEAP_SIZE="${LS_HEAP_SIZE:=500m}"
 
@@ -24,7 +21,6 @@ setup
 export HOME SINCEDB_DIR
 
 case $1 in
-  deps) install_deps ;;
   -*)
     if [ -z "$VENDORED_JRUBY" ] ; then
       exec "${RUBYCMD}" "${basedir}/lib/logstash/runner.rb" "agent" "$@"
