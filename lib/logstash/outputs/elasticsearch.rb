@@ -4,6 +4,7 @@ require "logstash/environment"
 require "logstash/outputs/base"
 require "logstash/json"
 require "stud/buffer"
+require "stud/try"
 require "socket" # for Socket.gethostname
 
 # This output lets you store logs in Elasticsearch and is the most recommended
@@ -322,6 +323,19 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     @embedded_elasticsearch.start
   end # def start_local_elasticsearch
 
+  # TODO(talevy): pending understanding of which errors to retry on
+  def is_retryable_status(es_status)
+    java_import org.elasticsearch.rest.RestStatus
+    case es_status
+    when RestStatus::SERVICE_UNAVAILABLE
+      return true
+    when RestStatus::BAD_REQUEST
+      return true
+    else
+      return false
+    end
+  end # def is_retryable_status
+
   public
   def receive(event)
     return unless output?(event)
@@ -339,24 +353,27 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     buffer_receive([event.sprintf(@action), { :_id => document_id, :_index => index, :_type => type }, event.to_hash])
   end # def receive
 
-  def flush(actions, teardown=false)
+  def flush(actions, teardown = false)
     begin
       @logger.debug? and @logger.debug "Sending bulk of actions to client[#{@client_idx}]: #{@host[@client_idx]}"
-      @current_client.bulk(actions)
+      Stud::try(3.times) do
+        bulk_response = @current_client.bulk(actions)
+        # TODO(talevy): return failure codes so error logs are more useful.
+        actions = bulk_response.getItems
+          .select { |i| i.isFailed && is_retryable_status(i.getFailure.getStatus) }
+          .map { |i| actions[i.getItemId] }
+        if actions
+          raise LogStash::BulkSendError, "Failed sending the following actions: #{actions}."
+        end
+      end
     rescue => e
       @logger.error "Got error to send bulk of actions to elasticsearch server at #{@host[@client_idx]} : #{e.message}"
-      raise e
     ensure
       unless @protocol == "node"
           @logger.debug? and @logger.debug "Shifting current elasticsearch client"
           shift_client
       end
     end
-    # TODO(sissel): Handle errors. Since bulk requests could mostly succeed
-    # (aka partially fail), we need to figure out what documents need to be
-    # retried.
-    #
-    # In the worst case, a failing flush (exception) will incur a retry from Stud::Buffer.
   end # def flush
 
   def teardown

@@ -2,6 +2,7 @@ require "spec_helper"
 require "ftw"
 require "logstash/plugin"
 require "logstash/json"
+require "stud/try"
 
 describe "outputs/elasticsearch" do
 
@@ -343,6 +344,52 @@ describe "outputs/elasticsearch" do
           # 'at' is a stopword, make sure stopwords are not ignored.
           insist { terms }.include?("at")
         end
+      end
+    end
+  end
+
+  # TODO(talevy): actually make this test something
+  describe "flush with failed item responses", :todo => true do
+    protocol = "node"
+    context "with protocol => #{protocol}" do
+      subject do
+        require "logstash/outputs/elasticsearch"
+        settings = {
+          "manage_template" => true,
+          "template_overwrite" => true,
+          "protocol" => protocol,
+          "host" => "localhost"
+        }
+        next LogStash::Outputs::ElasticSearch.new(settings)
+      end
+
+      before :each do
+        # Delete all templates first.
+        require "elasticsearch"
+
+        # Clean ES of data before we start.
+        @es = Elasticsearch::Client.new
+        @es.indices.delete_template(:name => "*")
+
+        # This can fail if there are no indexes, ignore failure.
+        @es.indices.delete(:index => "*") rescue nil
+
+        subject.register
+
+        subject.receive(LogStash::Event.new("message" => "sample message here"))
+        subject.receive(LogStash::Event.new("geoip" => { "location" => [ 0.0, 0.0 ] }))
+        subject.receive(LogStash::Event.new("geoip" => "simply wrong"))
+        subject.buffer_flush(:final => true)
+        @es.indices.refresh
+
+        # Wait or fail until everything's indexed.
+        Stud::try(20.times) do
+          r = @es.search
+          insist { r["hits"]["total"] } == 2
+        end
+      end
+
+      it "retries failed 429" do
       end
     end
   end
