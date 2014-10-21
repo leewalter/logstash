@@ -228,9 +228,7 @@ module LogStash::Outputs::Elasticsearch
         actions.each do |action, args, source|
           prep.add(build_request(action, args, source))
         end
-        response = prep.execute.actionGet()
-
-        # TODO(sissel): What format should the response be in?
+        return prep.execute.actionGet()
       end # def bulk
 
       def build_request(action, args, source)
