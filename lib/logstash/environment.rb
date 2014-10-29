@@ -8,6 +8,7 @@ module LogStash
     LOGSTASH_HOME = ::File.expand_path(::File.join(::File.dirname(__FILE__), "..", ".."))
     JAR_DIR = ::File.join(LOGSTASH_HOME, "vendor", "jar")
     ELASTICSEARCH_DIR = ::File.join(LOGSTASH_HOME, "vendor", "elasticsearch")
+    KAFKA_DIR = ::File.join(LOGSTASH_HOME, "vendor", "kafka")
     BUNDLE_DIR = ::File.join(LOGSTASH_HOME, "vendor", "bundle")
     PLUGINS_DIR = ::File.join(LOGSTASH_HOME, "vendor", "plugins")
     GEMFILE_PATH = ::File.join(LOGSTASH_HOME, "tools", "Gemfile")
@@ -19,6 +20,24 @@ module LogStash
 
       require "java"
       jars_path = ::File.join(ELASTICSEARCH_DIR, "**", "*.jar")
+      jar_files = Dir.glob(jars_path)
+
+      raise(LogStash::EnvironmentError, "Could not find Elasticsearch jar files under #{ELASTICSEARCH_DIR}") if jar_files.empty?
+
+      jar_files.each do |jar|
+        loaded = require jar
+        puts("Loaded #{jar}") if $DEBUG && loaded
+      end
+    end
+
+    # loads currently embedded kafka jars
+    # @raise LogStash::EnvironmentError if not running under JRuby or if no jar files are found
+    def load_kafka_jars!
+      raise(LogStash::EnvironmentError, "JRuby is required") unless jruby?
+
+      require "java"
+
+      jars_path = ::File.join(KAFKA_DIR, "*.jar")
       jar_files = Dir.glob(jars_path)
 
       raise(LogStash::EnvironmentError, "Could not find Elasticsearch jar files under #{ELASTICSEARCH_DIR}") if jar_files.empty?
