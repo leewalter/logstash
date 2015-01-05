@@ -9,6 +9,13 @@ require "logstash/filters/base"
 require "logstash/inputs/base"
 require "logstash/outputs/base"
 
+module State
+  NOT_RUNNING = :NOT_RUNNING
+  RUNNING = :RUNNING
+  SHUTTING_DOWN = :SHUTTING_DOWN
+  STOPPED = :STOPPED
+end
+
 class LogStash::Pipeline
 
   FLUSH_EVENT = LogStash::FlushEvent.new
@@ -42,18 +49,13 @@ class LogStash::Pipeline
     else
       @filter_to_output = SizedQueue.new(20)
     end
+
     @settings = {
       "filter-workers" => 1,
     }
+
+    @state = State::NOT_RUNNING
   end # def initialize
-
-  def ready?
-    return @ready
-  end
-
-  def started?
-    return @started
-  end
 
   def configure(setting, value)
     if setting == "filter-workers"
@@ -64,25 +66,48 @@ class LogStash::Pipeline
       end
     end
     @settings[setting] = value
+  end # def configure
+
+  def running?
+    return @running
+  end
+
+  def shutting_down?
+    return @shutting_down
   end
 
   def filters?
     return @filters.any?
   end
 
-  def run
-    @started = true
+  def status
+    {
+      :state => @state,
+      :input_count => @input_to_filter.push_meter.count,
+      :output_count => @filter_to_output.push_meter.count
+    }
+  end
+
+  def start
+    @state = STATE::RUNNING
     @input_threads = []
 
     start_inputs
     start_filters if filters?
     start_outputs
 
-    @ready = true
-
     @logger.info("Pipeline started")
-    wait_inputs
+  end # def run
 
+  def wait
+    if @state == STATE::RUNNING
+      wait_inputs
+    end
+  end
+
+  def shutdown_pipeline
+    @state = STATE::SHUTTING_DOWN
+    shutdown_inputs
     if filters?
       shutdown_filters
       wait_filters
@@ -93,10 +118,49 @@ class LogStash::Pipeline
     wait_outputs
 
     @logger.info("Pipeline shutdown complete.")
+    @state = STATE::STOPPED
+  end
 
-    # exit code
-    return 0
-  end # def run
+  # Shutdown this pipeline.
+  #
+  # This method is intended to be called from another thread
+  def shutdown_inputs
+    @input_threads.each do |thread|
+      # Interrupt all inputs
+      @logger.info("Sending shutdown signal to input thread",
+                   :thread => thread)
+      thread.raise(LogStash::ShutdownSignal)
+      begin
+        thread.wakeup # in case it's in blocked IO or sleeping
+      rescue ThreadError
+      end
+
+      # Sometimes an input is stuck in a blocking I/O
+      # so we need to tell it to teardown directly
+      @inputs.each do |input|
+        input.teardown
+      end
+    end
+
+    # No need to send the ShutdownEvent to the filters/outputs nor to wait for
+    # the inputs to finish, because in the #run method we wait for that anyway.
+  end # def shutdown
+
+  private
+
+  def plugin(plugin_type, name, *args)
+    args << {} if args.empty?
+    klass = LogStash::Plugin.lookup(plugin_type, name)
+    return klass.new(*args)
+  end
+
+  def filter(event, &block)
+    @filter_func.call(event, &block)
+  end
+
+  def output(event)
+    @output_func.call(event)
+  end
 
   def wait_inputs
     @input_threads.each(&:join)
@@ -105,7 +169,16 @@ class LogStash::Pipeline
     # so we catch Interrupt here and signal a shutdown. For some reason the
     # signal handler isn't invoked it seems? I dunno, haven't looked much into
     # it.
-    shutdown
+    shutdown_inputs
+  end
+
+  def wait_outputs
+    # Wait for the outputs to stop
+    @output_threads.each(&:join)
+  end
+
+  def wait_filters
+    @filter_threads.each(&:join) if @filter_threads
   end
 
   def shutdown_filters
@@ -113,18 +186,10 @@ class LogStash::Pipeline
     @input_to_filter.push(LogStash::ShutdownEvent.new)
   end
 
-  def wait_filters
-    @filter_threads.each(&:join) if @filter_threads
-  end
 
   def shutdown_outputs
     # nothing, filters will do this
     @filter_to_output.push(LogStash::ShutdownEvent.new)
-  end
-
-  def wait_outputs
-    # Wait for the outputs to stop
-    @output_threads.each(&:join)
   end
 
   def start_inputs
@@ -140,7 +205,7 @@ class LogStash::Pipeline
 
     @inputs.each do |input|
       input.register
-      start_input(input)
+      @input_threads << Thread.new { inputworker(plugin) }
     end
   end
 
@@ -161,9 +226,6 @@ class LogStash::Pipeline
     ]
   end
 
-  def start_input(plugin)
-    @input_threads << Thread.new { inputworker(plugin) }
-  end
 
   def inputworker(plugin)
     LogStash::Util::set_thread_name("<#{plugin.class.config_name}")
@@ -236,45 +298,6 @@ class LogStash::Pipeline
       output.worker_plugins.each(&:teardown)
     end
   end # def outputworker
-
-  # Shutdown this pipeline.
-  #
-  # This method is intended to be called from another thread
-  def shutdown
-    @input_threads.each do |thread|
-      # Interrupt all inputs
-      @logger.info("Sending shutdown signal to input thread",
-                   :thread => thread)
-      thread.raise(LogStash::ShutdownSignal)
-      begin
-        thread.wakeup # in case it's in blocked IO or sleeping
-      rescue ThreadError
-      end
-
-      # Sometimes an input is stuck in a blocking I/O
-      # so we need to tell it to teardown directly
-      @inputs.each do |input|
-        input.teardown
-      end
-    end
-
-    # No need to send the ShutdownEvent to the filters/outputs nor to wait for
-    # the inputs to finish, because in the #run method we wait for that anyway.
-  end # def shutdown
-
-  def plugin(plugin_type, name, *args)
-    args << {} if args.empty?
-    klass = LogStash::Plugin.lookup(plugin_type, name)
-    return klass.new(*args)
-  end
-
-  def filter(event, &block)
-    @filter_func.call(event, &block)
-  end
-
-  def output(event)
-    @output_func.call(event)
-  end
 
   # perform filters flush and yeild flushed event to the passed block
   # @param options [Hash]
