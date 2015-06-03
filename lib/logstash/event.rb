@@ -221,7 +221,7 @@ class LogStash::Event
   # TODO(sissel): It is not clear what the value of a field that
   # is an array (or hash?) should be. Join by comma? Something else?
   public
-  def sprintf(format)
+  def sprintf(format, timezone_id="UTC")
     if format.is_a?(Float) and
         (format < MIN_FLOAT_BEFORE_SCI_NOT or format >= MAX_FLOAT_BEFORE_SCI_NOT) then
       format = ("%.15f" % format).sub(/0*$/,"")
@@ -246,7 +246,7 @@ class LogStash::Event
       elsif key[0,1] == "+"
         t = @data[TIMESTAMP]
         formatter = org.joda.time.format.DateTimeFormat.forPattern(key[1 .. -1])\
-          .withZone(org.joda.time.DateTimeZone::UTC)
+          .withZone(org.joda.time.DateTimeZone.forID(timezone_id))
         #next org.joda.time.Instant.new(t.tv_sec * 1000 + t.tv_usec / 1000).toDateTime.toString(formatter)
         # Invoke a specific Instant constructor to avoid this warning in JRuby
         #  > ambiguous Java methods found, using org.joda.time.Instant(long)
