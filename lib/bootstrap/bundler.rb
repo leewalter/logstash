@@ -74,11 +74,12 @@ module LogStash
     # @option options [Boolean] :local Do not attempt to fetch gems remotely and use the gem cache instead (default: false)
     # @option options [Boolean] :package Locks and then caches all dependencies to be reused later on (default: false)
     # @option options [Boolean] :all It packages dependencies defined with :git or :path (default: false)
+    # @option options [Boolean] :parallel Installs gems in parallel using 1 worker per logical core.
     # @option options [Array] :without  Exclude gems that are part of the specified named group (default: [:development])
     # @return [String, Exception] the installation captured output and any raised exception or nil if none
     def invoke!(options = {})
       options = {:max_tries => 10, :clean => false, :install => false, :update => false, :local => false,
-                 :all => false, :package => false, :without => [:development]}.merge(options)
+                 :all => false, :package => false, :without => [:development], :parallel => false}.merge(options)
       options[:without] = Array(options[:without])
       options[:update] = Array(options[:update]) if options[:update]
 
@@ -151,6 +152,9 @@ module LogStash
           arguments << "--local"
           arguments << "--no-prune" # From bundler docs: Don't remove stale gems from the cache.
         end
+        if options[:parallel]
+          arguments.push("--jobs", java.lang.Runtime.getRuntime.availableProcessors)
+        end
       elsif options[:update]
         arguments << "update"
         arguments << options[:update]
@@ -161,6 +165,7 @@ module LogStash
         arguments << "package"
         arguments << "--all" if options[:all]
       end
+
 
       arguments.flatten
     end
