@@ -43,7 +43,7 @@ module LogStash; class Pipeline
 
   def initialize(config_str, settings = LogStash::SETTINGS, namespaced_metric = nil)
     @config_str = config_str
-    @logger = Cabin::Channel.get(LogStash)
+    @logger = org.apache.logging.log4j.LogManager.getLogger("LogStash")
     @settings = settings
     @pipeline_id = @settings.get_value("pipeline.id") || self.object_id
     @reporter = LogStash::PipelineReporter.new(@logger, self)
@@ -72,8 +72,8 @@ module LogStash; class Pipeline
     # The config code is hard to represent as a log message...
     # So just print it.
 
-    if @settings.get_value("config.debug") && logger.debug?
-      logger.debug("Compiled pipeline code", :code => code)
+    if @settings.get_value("config.debug") && logger.is_debug_enabled
+      logger.debug("Compiled pipeline code", "code" => code)
     end
 
     begin
@@ -112,14 +112,14 @@ module LogStash; class Pipeline
     if @settings.set?("pipeline.workers")
       if pipeline_workers > 1
         @logger.warn("Warning: Manual override - there are filters that might not work with multiple worker threads",
-                     :worker_threads => pipeline_workers, :filters => plugins)
+                     "worker_threads" => pipeline_workers, "filters" => plugins)
       end
     else
       # user did not specify a worker thread count
       # warn if the default is multiple
       if default > 1
         @logger.warn("Defaulting pipeline worker threads to 1 because there are some filters that might not work with multiple worker threads",
-                     :count_was => default, :filters => plugins)
+                     "count_was" => default, "filters" => plugins)
         return 1 # can't allow the default value to propagate if there are unsafe filters
       end
     end
@@ -138,7 +138,8 @@ module LogStash; class Pipeline
 
     start_workers
 
-    @logger.log("Pipeline #{@pipeline_id} started")
+    # TODO(talevy): figure out other way to do this
+    # @logger.log("Pipeline #{@pipeline_id} started")
 
     # Block until all inputs have stopped
     # Generally this happens if SIGINT is sent and `shutdown` is called from an external thread
@@ -153,7 +154,8 @@ module LogStash; class Pipeline
     shutdown_flusher
     shutdown_workers
 
-    @logger.log("Pipeline #{@pipeline_id} has been shutdown")
+    # TODO(talevy): figure out other way to do this.
+    # @logger.log("Pipeline #{@pipeline_id} has been shutdown")
 
     # exit code
     return 0
@@ -363,20 +365,20 @@ module LogStash; class Pipeline
     rescue => e
       if plugin.stop?
         @logger.debug("Input plugin raised exception during shutdown, ignoring it.",
-                      :plugin => plugin.class.config_name, :exception => e,
-                      :backtrace => e.backtrace)
+                      "plugin" => plugin.class.config_name, "exception" => e,
+                      "backtrace" => e.backtrace)
         return
       end
 
       # otherwise, report error and restart
-      if @logger.debug?
+      if @logger.is_debug_enabled
         @logger.error(I18n.t("logstash.pipeline.worker-error-debug",
-                             :plugin => plugin.inspect, :error => e.to_s,
-                             :exception => e.class,
-                             :stacktrace => e.backtrace.join("\n")))
+                             "plugin" => plugin.inspect, "error" => e.to_s,
+                             "exception" => e.class,
+                             "stacktrace" => e.backtrace.join("\n")))
       else
         @logger.error(I18n.t("logstash.pipeline.worker-error",
-                             :plugin => plugin.inspect, :error => e))
+                             "plugin" => plugin.inspect, "error" => e))
       end
 
       # Assuming the failure that caused this exception is transient,
@@ -412,7 +414,7 @@ module LogStash; class Pipeline
   def shutdown_workers
     # Each worker thread will receive this exactly once!
     @worker_threads.each do |t|
-      @logger.debug("Pushing shutdown", :thread => t.inspect)
+      @logger.debug("Pushing shutdown", "thread" => t.inspect)
       @input_queue.push(LogStash::SHUTDOWN)
     end
 
@@ -480,7 +482,7 @@ module LogStash; class Pipeline
 
   def flush
     if @flushing.compare_and_set(false, true)
-      @logger.debug? && @logger.debug("Pushing flush onto pipeline")
+      @logger.is_debug_enabled && @logger.debug("Pushing flush onto pipeline")
       @input_queue.push(LogStash::FLUSH)
     end
   end
@@ -500,7 +502,7 @@ module LogStash; class Pipeline
   def flush_filters_to_batch(batch, options = {})
     flush_filters(options) do |event|
       unless event.cancelled?
-        @logger.debug? and @logger.debug("Pushing flushed events", :event => event)
+        @logger.is_debug_enabled and @logger.debug("Pushing flushed events", "event" => event.to_hash)
         batch << event
       end
     end
