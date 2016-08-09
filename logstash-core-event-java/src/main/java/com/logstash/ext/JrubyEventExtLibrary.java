@@ -38,12 +38,15 @@ public class JrubyEventExtLibrary implements Library {
         clazz.setConstant("TIMESTAMP", runtime.newString(Event.TIMESTAMP));
         clazz.setConstant("TIMESTAMP_FAILURE_TAG", runtime.newString(Event.TIMESTAMP_FAILURE_TAG));
         clazz.setConstant("TIMESTAMP_FAILURE_FIELD", runtime.newString(Event.TIMESTAMP_FAILURE_FIELD));
-        clazz.setConstant("DEFAULT_LOGGER", runtime.getModule("Cabin").getClass("Channel").callMethod("get", runtime.getModule("LogStash")));
+        try {
+            clazz.setConstant("DEFAULT_LOGGER", runtime.getModule("Cabin").getClass("Channel").callMethod("get", runtime.getModule("LogStash")));
+        } catch (NullPointerException e) { }
         clazz.setConstant("VERSION", runtime.newString(Event.VERSION));
         clazz.setConstant("VERSION_ONE", runtime.newString(Event.VERSION_ONE));
         clazz.defineAnnotatedMethods(RubyEvent.class);
         clazz.defineAnnotatedConstants(RubyEvent.class);
 
+        /**
         PARSER_ERROR = runtime.getModule("LogStash").defineOrGetModuleUnder("Json").getClass("ParserError");
         if (PARSER_ERROR == null) {
             throw new RaiseException(runtime, runtime.getClass("StandardError"), "Could not find LogStash::Json::ParserError class", true);
@@ -56,6 +59,7 @@ public class JrubyEventExtLibrary implements Library {
         if (LOGSTASH_ERROR == null) {
             throw new RaiseException(runtime, runtime.getClass("StandardError"), "Could not find LogStash::Error class", true);
         }
+         */
     }
 
     public static class ProxyLogger implements Logger {

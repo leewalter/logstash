@@ -1,5 +1,6 @@
 package com.logstash;
 
+import com.logstash.ext.JrubyEventExtLibrary;
 import com.logstash.ext.JrubyTimestampExtLibrary;
 import org.jruby.CompatVersion;
 import org.jruby.Ruby;
@@ -20,6 +21,7 @@ public abstract class TestBase {
         ruby = Ruby.newInstance(config_19);
         RubyBigDecimal.createBigDecimal(ruby); // we need to do 'require "bigdecimal"'
         JrubyTimestampExtLibrary.createTimestamp(ruby);
+        (new JrubyEventExtLibrary()).load(ruby, true);
         setupDone = true;
     }
 }

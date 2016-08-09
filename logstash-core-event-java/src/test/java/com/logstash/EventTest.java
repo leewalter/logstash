@@ -1,5 +1,10 @@
 package com.logstash;
 
+import com.logstash.bivalues.BiValues;
+import com.logstash.ext.JrubyEventExtLibrary;
+import org.jruby.RubyString;
+import org.jruby.RubySymbol;
+import org.jruby.runtime.ThreadContext;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -13,7 +18,7 @@ import static net.javacrumbs.jsonunit.JsonAssert.assertJsonEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
-public class EventTest {
+public class EventTest extends TestBase {
     @Test
     public void toBinaryRoundtrip() throws Exception {
         Event e = new Event();
@@ -33,6 +38,23 @@ public class EventTest {
         assertEquals(42L, er.getField("[@metadata][foo]"));
 
         assertEquals(e.getTimestamp().toIso8601(), er.getTimestamp().toIso8601());
+    }
+
+    @Test
+    public void toBinaryRoundtripWithRubySymbols() throws Exception {
+
+        JrubyEventExtLibrary.RubyEvent originalEvent = (JrubyEventExtLibrary.RubyEvent)
+                ruby.evalScriptlet("LogStash::Event.new({\"message\" => :symbol})");
+
+        byte[] binary = originalEvent.getEvent().toBinary();
+
+        JrubyEventExtLibrary.RubyEvent convertedEvent = JrubyEventExtLibrary.RubyEvent.newRubyEvent(ruby, Event.fromBinary(binary));
+
+
+        ThreadContext context = ruby.getCurrentContext();
+        RubyString messageString = RubyString.newString(ruby, "message");
+
+        assertEquals(convertedEvent.ruby_get_field(context, messageString), originalEvent.ruby_get_field(context, messageString));
     }
 
     @Test
