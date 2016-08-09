@@ -26,6 +26,8 @@ Gem::Specification.new do |gem|
   # which does not have this problem.
   gem.add_runtime_dependency "ruby-maven", "~> 3.3.9"
 
-  gem.requirements << "jar com.fasterxml.jackson.core:jackson-core, 2.7.1"
-  gem.requirements << "jar com.fasterxml.jackson.core:jackson-databind, 2.7.1-1"
+  gem.requirements << "jar com.fasterxml.jackson.core:jackson-core, 2.7.3"
+  gem.requirements << "jar com.fasterxml.jackson.core:jackson-databind, 2.7.3"
+  gem.requirements << "jar com.fasterxml.jackson.module:jackson-module-afterburner, 2.7.3"
+  gem.requirements << "jar com.fasterxml.jackson.dataformat:jackson-dataformat-cbor, 2.7.3"
 end
