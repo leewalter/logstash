@@ -136,11 +136,13 @@ public class Queue implements Closeable {
     public void open() throws IOException {
         final int headPageNum;
 
-        if (!this.closed.get()) { throw new IOException("queue already opened"); }
+        if (!this.closed.get()) {
+            throw new IOException("queue already opened");
+        }
 
         Checkpoint headCheckpoint;
         try {
-            headCheckpoint = this.checkpointIO.read(checkpointIO.headFileName());
+            headCheckpoint = this.checkpointIO.readHead();
         } catch (NoSuchFileException e) {
             headCheckpoint = null;
         }
@@ -162,7 +164,7 @@ public class Queue implements Closeable {
         for (int pageNum = headCheckpoint.getFirstUnackedPageNum(); pageNum < headCheckpoint.getPageNum(); pageNum++) {
 
             // all tail checkpoints in the sequence should exist, if not abort mission with a NoSuchFileException
-            Checkpoint tailCheckpoint = this.checkpointIO.read(this.checkpointIO.tailFileName(pageNum));
+            Checkpoint tailCheckpoint = this.checkpointIO.readTail(pageNum);
 
             PageIO pageIO = this.pageIOFactory.build(pageNum, this.pageCapacity, this.dirPath);
 
@@ -219,7 +221,7 @@ public class Queue implements Closeable {
 
             if (this.tailPages.size() == 0) {
                 // this is the first tail page and it is fully acked so just purge it
-                this.checkpointIO.purge(this.checkpointIO.tailFileName(checkpoint.getPageNum()));
+                this.checkpointIO.purgeTail(checkpoint.getPageNum());
             } else {
                 // create a tail page with a null PageIO and add it to tail pages but not unreadTailPages
                 // since it is fully read because also fully acked
@@ -523,13 +525,13 @@ public class Queue implements Closeable {
 
                      if (result.index == 0) {
                         // if this is the first page also remove checkpoint file
-                        this.checkpointIO.purge(this.checkpointIO.tailFileName(result.page.getPageNum()));
+                        this.checkpointIO.purgeTail(result.page.getPageNum());
 
                          // and see if next "first tail page" is also fully acked and remove checkpoint file
                         while (this.tailPages.size() > 0) {
                             TailPage p = this.tailPages.get(0);
                             if (!p.isFullyAcked()) { break; }
-                            this.checkpointIO.purge(this.checkpointIO.tailFileName(p.getPageNum()));
+                            this.checkpointIO.purgeTail(p.getPageNum());
                             this.tailPages.remove(0);
                         }
                     }

@@ -26,9 +26,9 @@ public class MemoryCheckpointTest {
 
     @Test
     public void writeNewReadExisting() throws IOException {
-        io.write("checkpoint.head", 1, 2, 3, 4, 5);
+        io.writeTail(1, 2, 3, 4, 5);
 
-        Checkpoint checkpoint = io.read("checkpoint.head");
+        Checkpoint checkpoint = io.readTail(1);
 
         assertThat(checkpoint.getPageNum(), is(equalTo(1)));
         assertThat(checkpoint.getFirstUnackedPageNum(), is(equalTo(2)));
@@ -39,7 +39,7 @@ public class MemoryCheckpointTest {
 
     @Test
     public void readInnexisting() throws IOException {
-        Checkpoint checkpoint = io.read("checkpoint.invalid");
+        Checkpoint checkpoint = io.readTail(3);
         assertThat(checkpoint, is(equalTo(null)));
     }
 }

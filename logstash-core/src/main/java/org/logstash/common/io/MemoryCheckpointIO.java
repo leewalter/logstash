@@ -24,42 +24,34 @@ public class MemoryCheckpointIO implements CheckpointIO {
     }
 
     @Override
-    public Checkpoint read(String fileName) throws IOException {
-        return this.sources.get(fileName);
-    }
-
-    @Override
-    public Checkpoint write(String fileName, int pageNum, int firstUnackedPageNum, long firstUnackedSeqNum, long minSeqNum, int elementCount) throws IOException {
+    public Checkpoint writeTail(int pageNum, int firstUnackedPageNum, long firstUnackedSeqNum, long minSeqNum, int elementCount) throws IOException {
         Checkpoint checkpoint = new Checkpoint(pageNum, firstUnackedPageNum, firstUnackedSeqNum, minSeqNum, elementCount);
-        write(fileName, checkpoint);
+        this.sources.put(TAIL_CHECKPOINT + pageNum, checkpoint);
         return checkpoint;
     }
 
     @Override
-    public void write(String fileName, Checkpoint checkpoint) throws IOException {
-        this.sources.put(fileName, checkpoint);
+    public Checkpoint writeHead(Checkpoint checkpoint) throws IOException {
+        return this.sources.put(HEAD_CHECKPOINT, checkpoint);
     }
 
     @Override
-    public void purge(String fileName) {
-        this.sources.remove(fileName);
+    public Checkpoint readHead() throws IOException {
+        return this.sources.get(HEAD_CHECKPOINT);
     }
 
     @Override
-    public void purge() {
-        this.sources.clear();
+    public Checkpoint readTail(int pageNum) throws IOException {
+        return this.sources.get(TAIL_CHECKPOINT + pageNum);
     }
 
-    // @return the head page checkpoint file name
     @Override
-    public String headFileName() {
-        return HEAD_CHECKPOINT;
+    public void purgeHead() {
+        this.sources.remove(HEAD_CHECKPOINT);
     }
 
-    // @return the tail page checkpoint file name for given page number
     @Override
-    public String tailFileName(int pageNum) {
-        return TAIL_CHECKPOINT + pageNum;
+    public void purgeTail(int pageNum) {
+        this.sources.remove(TAIL_CHECKPOINT + pageNum);
     }
-
 }

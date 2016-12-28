@@ -9,7 +9,6 @@ import org.logstash.common.io.ByteBufferPageIO;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -190,7 +189,7 @@ public class QueueTest {
         q.open();
 
         assertThat(q.getHeadPage().getPageNum(), is(equalTo(0)));
-        Checkpoint c = q.getCheckpointIO().read("checkpoint.head");
+        Checkpoint c = q.getCheckpointIO().readHead();
         assertThat(c.getPageNum(), is(equalTo(0)));
         assertThat(c.getElementCount(), is(equalTo(0)));
         assertThat(c.getMinSeqNum(), is(equalTo(0L)));
@@ -201,7 +200,7 @@ public class QueueTest {
             q.write(e);
         }
 
-        c = q.getCheckpointIO().read("checkpoint.head");
+        c = q.getCheckpointIO().readHead();
         assertThat(c.getPageNum(), is(equalTo(0)));
         assertThat(c.getElementCount(), is(equalTo(0)));
         assertThat(c.getMinSeqNum(), is(equalTo(0L)));
@@ -211,7 +210,7 @@ public class QueueTest {
 //        assertThat(elements1.get(1).getSeqNum(), is(equalTo(2L)));
         q.ensurePersistedUpto(2);
 
-        c = q.getCheckpointIO().read("checkpoint.head");
+        c = q.getCheckpointIO().readHead();
         assertThat(c.getPageNum(), is(equalTo(0)));
         assertThat(c.getElementCount(), is(equalTo(2)));
         assertThat(c.getMinSeqNum(), is(equalTo(1L)));
@@ -222,14 +221,14 @@ public class QueueTest {
             q.write(e);
         }
 
-        c = q.getCheckpointIO().read("checkpoint.head");
+        c = q.getCheckpointIO().readHead();
         assertThat(c.getPageNum(), is(equalTo(1)));
         assertThat(c.getElementCount(), is(equalTo(0)));
         assertThat(c.getMinSeqNum(), is(equalTo(0L)));
         assertThat(c.getFirstUnackedSeqNum(), is(equalTo(0L)));
         assertThat(c.getFirstUnackedPageNum(), is(equalTo(0)));
 
-        c = q.getCheckpointIO().read("checkpoint.0");
+        c = q.getCheckpointIO().readHead();
         assertThat(c.getPageNum(), is(equalTo(0)));
         assertThat(c.getElementCount(), is(equalTo(2)));
         assertThat(c.getMinSeqNum(), is(equalTo(1L)));
@@ -238,9 +237,9 @@ public class QueueTest {
         Batch b = q.nonBlockReadBatch(10);
         b.close();
 
-        assertThat(q.getCheckpointIO().read("checkpoint.0"), is(nullValue()));
+        assertThat(q.getCheckpointIO().readTail(0), is(nullValue()));
 
-        c = q.getCheckpointIO().read("checkpoint.head");
+        c = q.getCheckpointIO().readHead();
         assertThat(c.getPageNum(), is(equalTo(1)));
         assertThat(c.getElementCount(), is(equalTo(2)));
         assertThat(c.getMinSeqNum(), is(equalTo(3L)));
@@ -250,7 +249,7 @@ public class QueueTest {
         b = q.nonBlockReadBatch(10);
         b.close();
 
-        c = q.getCheckpointIO().read("checkpoint.head");
+        c = q.getCheckpointIO().readHead();
         assertThat(c.getPageNum(), is(equalTo(1)));
         assertThat(c.getElementCount(), is(equalTo(2)));
         assertThat(c.getMinSeqNum(), is(equalTo(3L)));
@@ -516,6 +515,13 @@ public class QueueTest {
         assertThat(q.isFull(), is(true)); // queue should still be full
 
         executor.shutdown();
+    }
+
+    @Test
+    public void testTheFuture() throws IOException {
+        Settings settings = TestSettings.getSettingsCheckpointFilePageMemory(100, dataPath);
+        Queue q = new Queue(settings);
+        q.open();
     }
 
     @Test

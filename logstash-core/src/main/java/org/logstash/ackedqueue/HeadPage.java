@@ -105,7 +105,7 @@ public class HeadPage extends Page {
 
                  // non-dry code with forceCheckpoint() to avoid unnecessary extra new Checkpoint object creation
                  CheckpointIO io = queue.getCheckpointIO();
-                 io.write(io.headFileName(), checkpoint);
+                 io.writeHead(checkpoint);
                  this.lastCheckpoint = checkpoint;
              }
          }
@@ -115,7 +115,7 @@ public class HeadPage extends Page {
     public void forceCheckpoint() throws IOException {
         Checkpoint checkpoint = new Checkpoint(this.pageNum, this.queue.firstUnackedPageNum(), firstUnackedSeqNum(), this.minSeqNum, this.elementCount);
         CheckpointIO io = queue.getCheckpointIO();
-        io.write(io.headFileName(), checkpoint);
+        io.writeHead(checkpoint);
         this.lastCheckpoint = checkpoint;
     }
 

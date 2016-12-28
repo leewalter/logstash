@@ -30,11 +30,11 @@ public class TailPage extends Page {
     }
 
     public void checkpoint() throws IOException {
-        // TODO: not concurrent for first iteration:
+        // TODO(talevy): to be or not to be concurrent
 
         // since this is a tail page and no write can happen in this page, there is no point in performing a fsync on this page, just stamp checkpoint
         CheckpointIO io = queue.getCheckpointIO();
-        this.lastCheckpoint = io.write(io.tailFileName(this.pageNum), this.pageNum, 0, firstUnackedSeqNum(), this.minSeqNum, this.elementCount);
+        this.lastCheckpoint = io.writeTail(this.pageNum, 0, firstUnackedSeqNum(), this.minSeqNum, this.elementCount);
     }
 
     // delete all IO files associated with this page

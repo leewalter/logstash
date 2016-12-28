@@ -28,25 +28,24 @@ public class FileCheckpointIOTest {
                 .newFolder("checkpoints")
                 .getPath();
         io = new FileCheckpointIO(checkpointFolder);
+        Checkpoint checkpoint = new Checkpoint(0, 0, 1L, 8L, 10);
+        io.writeHead(checkpoint);
     }
 
     @Test
     public void read() throws Exception {
-        URL url = this.getClass().getResource("checkpoint.head");
-        String dirPath = Paths.get(url.toURI()).getParent().toString();
-        io = new FileCheckpointIO(dirPath);
-        Checkpoint chk = io.read("checkpoint.head");
+        io = new FileCheckpointIO(checkpointFolder);
+        Checkpoint chk = io.readHead();
         assertThat(chk.getMinSeqNum(), is(8L));
     }
 
     @Test
     public void write() throws Exception {
-        io.write("checkpoint.head", 6, 2, 10L, 8L, 200);
-        io.write("checkpoint.head", 6, 2, 10L, 8L, 200);
-        Path fullFileName = Paths.get(checkpointFolder, "checkpoint.head");
+        String checkpointFileName = "checkpoint.6";
+        io.writeTail(6, 2, 10L, 8L, 200);
+        Path fullFileName = Paths.get(checkpointFolder, checkpointFileName);
         byte[] contents = Files.readAllBytes(fullFileName);
-        URL url = this.getClass().getResource("checkpoint.head");
-        Path path = Paths.get(url.getPath());
+        Path path = Paths.get(checkpointFolder, checkpointFileName);
         byte[] compare = Files.readAllBytes(path);
         assertThat(contents, is(equalTo(compare)));
     }

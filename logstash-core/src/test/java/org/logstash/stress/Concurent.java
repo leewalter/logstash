@@ -60,7 +60,8 @@ public class Concurent {
         Instant start = Instant.now();
 
         Queue q = new Queue(settings);
-        q.getCheckpointIO().purge();
+        // TODO(talevy): what does this mean, since it doesn't work for files?
+        // q.getCheckpointIO().purge();
         q.open();
 
         System.out.print("stating single producers and single consumers stress test... ");
@@ -114,7 +115,8 @@ public class Concurent {
         Instant start = Instant.now();
 
         Queue q = new Queue(settings);
-        q.getCheckpointIO().purge();
+        // TODO(talevy): what does this mean, since it doesn't work for files?
+        // q.getCheckpointIO().purge();
         q.open();
 
         System.out.print("stating single producers and multiple consumers stress test... ");

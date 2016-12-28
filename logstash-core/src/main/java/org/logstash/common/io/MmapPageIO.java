@@ -1,6 +1,5 @@
 package org.logstash.common.io;
 
-import org.logstash.ackedqueue.Queueable;
 import org.logstash.ackedqueue.SequencedList;
 
 import java.io.File;

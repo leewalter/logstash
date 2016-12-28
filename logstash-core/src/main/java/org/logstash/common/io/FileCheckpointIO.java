@@ -4,9 +4,14 @@ import org.logstash.ackedqueue.Checkpoint;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 
 public class FileCheckpointIO  implements CheckpointIO {
 //    Checkpoint file structure
@@ -35,48 +40,58 @@ public class FileCheckpointIO  implements CheckpointIO {
     }
 
     @Override
-    public Checkpoint read(String fileName) throws IOException {
-        Path path = Paths.get(dirPath, fileName);
-        InputStream is = Files.newInputStream(path);
-        return read(new BufferedChecksumStreamInput(new InputStreamStreamInput(is)));
+    public Checkpoint readHead() throws IOException {
+        return read(HEAD_CHECKPOINT);
     }
 
     @Override
-    public Checkpoint write(String fileName, int pageNum, int firstUnackedPageNum, long firstUnackedSeqNum, long minSeqNum, int elementCount) throws IOException {
-        Checkpoint checkpoint = new Checkpoint(pageNum, firstUnackedPageNum, firstUnackedSeqNum, minSeqNum, elementCount);
-        write(fileName, checkpoint);
+    public Checkpoint readTail(int pageNum) throws IOException {
+        return read(TAIL_CHECKPOINT + pageNum);
+    }
+
+    private Checkpoint read(String fileName) throws IOException {
+        Path path = Paths.get(dirPath, fileName);
+        FileChannel channel = FileChannel.open(path, StandardOpenOption.READ);
+        FileLock lock = channel.lock(0, Long.MAX_VALUE, true);
+        InputStream is = Channels.newInputStream(channel);
+        Checkpoint checkpoint = read(new BufferedChecksumStreamInput(new InputStreamStreamInput(is)));
+        lock.release();
+        channel.close();
         return checkpoint;
     }
 
     @Override
-    public void write(String fileName, Checkpoint checkpoint) throws IOException {
-        Path path = Paths.get(dirPath, fileName);
+    public Checkpoint writeTail(int pageNum, int firstUnackedPageNum, long firstUnackedSeqNum, long minSeqNum, int elementCount) throws IOException {
+        Checkpoint checkpoint = new Checkpoint(pageNum, firstUnackedPageNum, firstUnackedSeqNum, minSeqNum, elementCount);
+        Path path = Paths.get(dirPath, TAIL_CHECKPOINT + pageNum);
+        return write(checkpoint, path);
+    }
+
+    @Override
+    public Checkpoint writeHead(Checkpoint checkpoint) throws IOException {
+        return write(checkpoint, Paths.get(dirPath, HEAD_CHECKPOINT));
+    }
+
+    private Checkpoint write(Checkpoint checkpoint, Path path) throws IOException {
         final byte[] buffer = new byte[BUFFER_SIZE];
         write(checkpoint, buffer);
-        Files.write(path, buffer);
+        path = Files.createFile(path);
+        FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE);
+        FileLock lock = channel.lock();
+        channel.write(ByteBuffer.wrap(buffer));
+        lock.release();
+        channel.close();
+        return checkpoint;
     }
 
     @Override
-    public void purge(String fileName) throws IOException {
-        Path path = Paths.get(dirPath, fileName);
-        Files.delete(path);
+    public void purgeTail(int pageNum) throws IOException {
+        Files.delete(Paths.get(dirPath, TAIL_CHECKPOINT + pageNum));
     }
 
     @Override
-    public void purge() throws IOException {
-        // TODO: dir traversal and delete all checkpoints?
-    }
-
-    // @return the head page checkpoint file name
-    @Override
-    public String headFileName() {
-         return HEAD_CHECKPOINT;
-    }
-
-    // @return the tail page checkpoint file name for given page number
-    @Override
-    public String tailFileName(int pageNum) {
-        return TAIL_CHECKPOINT + pageNum;
+    public void purgeHead() throws IOException {
+        Files.delete(Paths.get(dirPath, HEAD_CHECKPOINT));
     }
 
     private Checkpoint read(BufferedChecksumStreamInput crcsi) throws IOException {
